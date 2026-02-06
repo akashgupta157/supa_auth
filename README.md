@@ -1,17 +1,17 @@
-# Next.js Authentication System (Supabase + Tailwind)
+# SupaAuth – Next.js Authentication System
 
 ## Project Overview
 
-This project is a **secure, production-ready authentication system** built using:
+**SupaAuth** is a secure, production-ready authentication system built with:
 
 * **Next.js (App Router)**
 * **Supabase Authentication**
 * **Tailwind CSS**
-* **Vercel for deployment**
+* **Vercel**
 
-It supports **email & password signup, login, logout**, and **session-based route protection** using Supabase sessions and Next.js middleware.
+It supports **email & password authentication**, **session persistence**, **protected routes**, and **password recovery**, implemented using **server-side Supabase session handling** and **Next.js middleware-style request interception**.
 
-The application follows clean architecture, secure environment variable handling, and industry-standard best practices.
+This project follows real-world best practices and is designed to be clean, extensible, and deployment-ready.
 
 ---
 
@@ -19,23 +19,25 @@ The application follows clean architecture, secure environment variable handling
 
 * Email + Password Signup
 * Email + Password Login
-* Persistent authentication sessions
+* Email verification flow
+* Persistent auth sessions (across reloads)
 * Secure Logout
+* Forgot password & update password flows
 * Protected routes (authenticated users only)
-* Public routes (`/login`, `/signup`)
-* Auth pages inaccessible when logged in
-* Server-side session checks using Next.js middleware
-* Clean, minimal UI with Tailwind CSS
+* Auth routes blocked for logged-in users
+* Server-side session validation using Supabase SSR
+* Clean UI with Tailwind CSS (dark mode supported)
 * Deployed on Vercel
-* Version-controlled with GitHub
 
 ---
 
 ## Tech Stack
 
 * **Framework:** Next.js (App Router)
-* **Styling:** Tailwind CSS
-* **Auth Provider:** Supabase Auth
+* **Authentication:** Supabase Auth
+* **Styling:** Tailwind CSS + shadcn/ui
+* **Forms & Validation:** React Hook Form + Zod
+* **Session Handling:** Supabase SSR
 * **Deployment:** Vercel
 * **Version Control:** GitHub
 
@@ -46,20 +48,30 @@ The application follows clean architecture, secure environment variable handling
 ```
 .
 ├── app
-│   ├── login
-│   ├── signup
-│   ├── dashboard (protected)
+│   ├── auth
+│   │   ├── login
+│   │   ├── sign-up
+│   │   ├── sign-up-success
+│   │   ├── forgot-password
+│   │   └── update-password
+│   ├── protected
+│   │   ├── layout.tsx
+│   │   └── page.tsx
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components
-│   ├── AuthForm.tsx
-│   └── Navbar.tsx
+│   ├── ui
+│   ├── login-form.tsx
+│   ├── sign-up-form.tsx
+│   ├── logout-button.tsx
+│   ├── auth-button.tsx
+│   └── theme-switcher.tsx
 ├── lib
 │   └── supabase
 │       ├── client.ts
-│       └── server.ts
-├── middleware.ts
-├── styles
+│       ├── server.ts
+│       └── proxy.ts
+├── proxy.ts
 ├── .env.example
 ├── README.md
 └── package.json
@@ -71,73 +83,87 @@ The application follows clean architecture, secure environment variable handling
 
 ### Signup
 
-1. User signs up using email and password
-2. Client-side validation runs before submission
+1. User signs up using email, password, and name
+2. Client-side validation with Zod
 3. Supabase creates the user
-4. User is redirected after successful signup
-5. Errors are handled and displayed properly
+4. Verification email is sent
+5. User is redirected to `/auth/sign-up-success`
+
+---
 
 ### Login
 
-1. User logs in using email and password
+1. User logs in with email & password
 2. Supabase validates credentials
-3. Session is stored securely
-4. Session persists across page reloads
-5. User is redirected to protected content
+3. Session cookies are set
+4. Session persists across reloads
+5. User is redirected to `/protected`
+
+---
 
 ### Logout
 
 1. Supabase session is cleared
-2. User is redirected to `/login`
-3. Protected routes become inaccessible
+2. Cookies are removed
+3. User is redirected to `/auth/login`
+
+---
+
+### Forgot / Update Password
+
+* Users can request a password reset email
+* Reset link redirects to `/auth/update-password`
+* New password is securely updated via Supabase
 
 ---
 
 ## Route Protection Strategy
 
-* **Middleware (`middleware.ts`)** is used to:
+This project uses **server-side session checks** via Supabase SSR.
 
-  * Protect authenticated routes
-  * Prevent logged-in users from accessing `/login` and `/signup`
-* Authentication state is verified **server-side**
+### How it works
+
+* Requests are intercepted using `proxy.ts`
+* Supabase session is validated on every request
+* Unauthenticated users are redirected to `/auth/login`
+* Authenticated users are blocked from accessing auth pages
+
+This ensures:
+
+* No flash of unauthenticated content
 * No client-only auth checks for protected routes
 
 ---
 
-## Pages
+## Routes & Access Rules
 
-| Route        | Access                        |
-| ------------ | ----------------------------- |
-| `/login`     | Public (blocked if logged in) |
-| `/signup`    | Public (blocked if logged in) |
-| `/dashboard` | Protected                     |
-| `/`          | Protected or redirected       |
+| Route                   | Access                        |
+| ----------------------- | ----------------------------- |
+| `/auth/login`           | Public (blocked if logged in) |
+| `/auth/sign-up`         | Public (blocked if logged in) |
+| `/auth/forgot-password` | Public                        |
+| `/auth/update-password` | Public (token-based)          |
+| `/protected`            | Authenticated only            |
+| `/`                     | Redirects based on auth state |
 
 ---
 
 ## Environment Variables
 
-Create a `.env.local` file using the example below.
+Create a `.env.local` file based on the example below.
 
 ### `.env.example`
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 ```
-
-> ⚠️ Never commit real environment variables to GitHub.
 
 ---
 
 ## Local Development Setup
 
 ### 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
-```
 
 ### 2. Install Dependencies
 
@@ -153,13 +179,15 @@ cp .env.example .env.local
 
 Fill in your Supabase credentials.
 
+---
+
 ### 4. Run the Development Server
 
 ```bash
 npm run dev
 ```
 
-Visit:
+Open:
 `http://localhost:3000`
 
 ---
@@ -168,11 +196,15 @@ Visit:
 
 1. Create a project at [https://supabase.com](https://supabase.com)
 2. Enable **Email / Password authentication**
-3. Copy:
+3. Configure:
+
+   * Email confirmations (recommended)
+   * Redirect URLs for auth
+4. Copy:
 
    * Project URL
    * Anon Public Key
-4. Add them to `.env.local` and Vercel environment variables
+5. Add them to `.env.local` and Vercel environment variables
 
 ---
 
@@ -180,5 +212,3 @@ Visit:
 
 **Live URL:**
 👉 `https://your-vercel-app.vercel.app`
-
----
