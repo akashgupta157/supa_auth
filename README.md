@@ -211,4 +211,4 @@ Open:
 ## Deployed Application
 
 **Live URL:**
-👉 `https://your-vercel-app.vercel.app`
+👉 `https://supa-auth-alpha.vercel.app`
